@@ -16,14 +16,14 @@ module dex::dex {
   use deepbook::custodian_v2::AccountCap;
 
   use dex::eth::ETH;
-  use dex::usdc::USDC;
+  use dex::naira::Naira;
 
   const CLIENT_ID: u64 = 122227;
   const MAX_U64: u64 = 18446744073709551615;
   const NO_RESTRICTION: u8 = 0;
   const FLOAT_SCALING: u64 = 1_000_000_000; 
 
-  const EAlreadyMintedThisEpoch: u64 = 0;
+  const EAlreadyDepositedThisEpoch: u64 = 0;
 
   struct DEX has drop {}
 
@@ -80,34 +80,34 @@ module dex::dex {
 
   public fun entry_place_market_order(
     self: &mut Storage,
-    pool: &mut Pool<ETH, USDC>,
+    pool: &mut Pool<ETH, Naira>,
     account_cap: &AccountCap,
     quantity: u64,
     is_bid: bool,
     base_coin: Coin<ETH>,
-    quote_coin: Coin<USDC>,
+    quote_coin: Coin<Naira>,
     c: &Clock,
     ctx: &mut TxContext,   
   ) {
-    let (eth, usdc, coin_dex) = place_market_order(self, pool, account_cap, quantity, is_bid, base_coin, quote_coin, c, ctx);
+    let (eth, naira, coin_dex) = place_market_order(self, pool, account_cap, quantity, is_bid, base_coin, quote_coin, c, ctx);
     let sender = tx_context::sender(ctx);
 
     transfer_coin(eth, sender);
-    transfer_coin(usdc, sender);
+    transfer_coin(naira, sender);
     transfer_coin(coin_dex, sender);
   }
 
   public fun place_market_order(
     self: &mut Storage,
-    pool: &mut Pool<ETH, USDC>,
+    pool: &mut Pool<ETH, Naira>,
     account_cap: &AccountCap,
     quantity: u64,
     is_bid: bool,
     base_coin: Coin<ETH>,
-    quote_coin: Coin<USDC>,
+    quote_coin: Coin<Naira>,
     c: &Clock,
     ctx: &mut TxContext,    
-  ): (Coin<ETH>, Coin<USDC>, Coin<DEX>) {
+  ): (Coin<ETH>, Coin<Naira>, Coin<DEX>) {
   let sender = tx_context::sender(ctx);  
 
   let client_order_id = 0;
@@ -126,7 +126,7 @@ module dex::dex {
     table::add(&mut self.swaps, sender, 1);
   };
   
-  let (eth_coin, usdc_coin) = clob::place_market_order<ETH, USDC>(
+  let (eth_coin, naira_coin) = clob::place_market_order<ETH, Naira>(
     pool, 
     account_cap, 
     client_order_id, 
@@ -138,17 +138,17 @@ module dex::dex {
     ctx
     );
 
-    (eth_coin, usdc_coin, dex_coin)
+    (eth_coin, naira_coin, dex_coin)
   }
   
   public fun create_pool(fee: Coin<SUI>, ctx: &mut TxContext) {
 
-    clob::create_pool<ETH, USDC>(1 * FLOAT_SCALING, 1, fee, ctx);
+    clob::create_pool<ETH, Naira>(1 * FLOAT_SCALING, 1, fee, ctx);
   }
 
   public fun fill_pool(
     self: &mut Storage,
-    pool: &mut Pool<ETH, USDC>, 
+    pool: &mut Pool<ETH, Naira>, 
     c: &Clock, 
     ctx: &mut TxContext
   ) {
@@ -160,12 +160,12 @@ module dex::dex {
   public fun create_state(
     self: &mut Storage, 
     eth_cap: TreasuryCap<ETH>, 
-    usdc_cap: TreasuryCap<USDC>, 
+    naira_cap: TreasuryCap<Naira>, 
     ctx: &mut TxContext
   ) {
 
     df::add(&mut self.id, get<ETH>(), Data { cap: eth_cap, faucet_lock: table::new(ctx) });
-    df::add(&mut self.id, get<USDC>(), Data { cap: usdc_cap, faucet_lock: table::new(ctx) });
+    df::add(&mut self.id, get<Naira>(), Data { cap: naira_cap, faucet_lock: table::new(ctx) });
   }
 
   public fun mint_coin<CoinType>(self: &mut Storage, ctx: &mut TxContext): Coin<CoinType> {
@@ -178,7 +178,7 @@ module dex::dex {
 
       let last_mint_epoch = table::borrow(&data.faucet_lock, tx_context::sender(ctx));
 
-      assert!(current_epoch > *last_mint_epoch, EAlreadyMintedThisEpoch);
+      assert!(current_epoch > *last_mint_epoch, EAlreadyDepositedThisEpoch);
     } else {
 
       table::add(&mut data.faucet_lock, sender, 0);
@@ -186,24 +186,24 @@ module dex::dex {
 
     let last_mint_epoch = table::borrow_mut(&mut data.faucet_lock, sender);
     *last_mint_epoch = tx_context::epoch(ctx);
-    coin::mint(&mut data.cap, if (type == get<USDC>()) 100 * FLOAT_SCALING else 1 * FLOAT_SCALING, ctx)
+    coin::mint(&mut data.cap, if (type == get<Naira>()) 70000 * FLOAT_SCALING else 1 * FLOAT_SCALING, ctx)
   }
 
   fun create_ask_orders(
     self: &mut Storage,
-    pool: &mut Pool<ETH, USDC>, 
+    pool: &mut Pool<ETH, Naira>, 
     c: &Clock, 
     ctx: &mut TxContext
   ) {
 
     let eth_data = df::borrow_mut<TypeName, Data<ETH>>(&mut self.id, get<ETH>());
 
-    clob::deposit_base<ETH, USDC>(pool, coin::mint(&mut eth_data.cap, 60000000000000, ctx), &self.account_cap);
+    clob::deposit_base<ETH, Naira>(pool, coin::mint(&mut eth_data.cap, 60000000000000, ctx), &self.account_cap);
 
     clob::place_limit_order(
       pool,
       self.client_id,
-     120 * FLOAT_SCALING, 
+     75000 * FLOAT_SCALING, 
      60000000000000,
       NO_RESTRICTION,
       false,
@@ -219,19 +219,19 @@ module dex::dex {
 
   fun create_bid_orders(
     self: &mut Storage,
-    pool: &mut Pool<ETH, USDC>,
+    pool: &mut Pool<ETH, Naira>,
     c: &Clock,
     ctx: &mut TxContext
   ) {
 
-    let usdc_data = df::borrow_mut<TypeName, Data<USDC>>(&mut self.id, get<USDC>());
+    let naira_data = df::borrow_mut<TypeName, Data<Naira>>(&mut self.id, get<Naira>());
 
-    clob::deposit_quote<ETH, USDC>(pool, coin::mint(&mut usdc_data.cap, 6000000000000000, ctx), &self.account_cap);
+    clob::deposit_quote<ETH, Naira>(pool, coin::mint(&mut naira_data.cap, 6000000000000000, ctx), &self.account_cap);
 
     clob::place_limit_order(
       pool,
       self.client_id, 
-      100 * FLOAT_SCALING, 
+      70000 * FLOAT_SCALING, 
       60000000000000,
       NO_RESTRICTION,
       true,
