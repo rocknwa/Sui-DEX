@@ -246,9 +246,8 @@ public fun repay_eth(account: &mut CollateralAccount, pool: &mut LendingPool, re
 }
 
 
-    public fun send_eth_receive_naira(
+ public fun send_eth_receive_naira(
         pool: &mut LendingPool,
-        sender: address,
         recipient: address,
         eth_amount: u64,
         ctx: &mut TxContext
@@ -263,7 +262,9 @@ public fun repay_eth(account: &mut CollateralAccount, pool: &mut LendingPool, re
         };
 
         let eth_coin = coin::take(&mut pool.eth_supply, eth_amount * FLOAT_SCALING, ctx);
-        transfer::public_transfer(eth_coin, sender);
+        //transfer::public_transfer(eth_coin, sender); 
+         coin::burn(&mut pool.treasury_cap_eth, eth_coin);
+        
 
         let naira_coin = coin::take(&mut pool.naira_supply, naira_equivalent, ctx);
         transfer::public_transfer(naira_coin, recipient);
@@ -277,7 +278,6 @@ public fun repay_eth(account: &mut CollateralAccount, pool: &mut LendingPool, re
 
     public fun send_naira_receive_eth(
         pool: &mut LendingPool,
-        sender: address,
         recipient: address,
         naira_amount: u64,
         ctx: &mut TxContext
@@ -292,7 +292,8 @@ public fun repay_eth(account: &mut CollateralAccount, pool: &mut LendingPool, re
         };
 
         let naira_coin = coin::take(&mut pool.naira_supply, naira_amount * FLOAT_SCALING, ctx);
-        transfer::public_transfer(naira_coin, sender);
+        //transfer::public_transfer(naira_coin, sender);
+         coin::burn(&mut pool.treasury_cap_naira, naira_coin);
 
         let eth_coin = coin::take(&mut pool.eth_supply, eth_equivalent, ctx);
         transfer::public_transfer(eth_coin, recipient);
@@ -341,8 +342,9 @@ public fun repay_eth(account: &mut CollateralAccount, pool: &mut LendingPool, re
         let pool = init(DEX {}, ctx);
         let dex_token_cap = DEXTreasuryCap {
             id: object::new(ctx),
-            cap: pool.treasury_cap_dex,
+            cap: pool.treasury_cap,
         };
         (pool, dex_token_cap)
     }
 }
+
